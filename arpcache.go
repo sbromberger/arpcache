@@ -43,6 +43,10 @@ func New(timeoutSeconds int64) *ArpCache {
 	return &ArpCache{cache: cache, defaultTimeout: timeoutSeconds}
 }
 
+func (a *ArpCache) SetDefaultTimeout(timeoutSeconds int64) {
+	a.defaultTimeout = timeoutSeconds
+}
+
 func (a *ArpCache) Get(ip net.IP) (net.HardwareAddr, bool) {
 	i, j := ipToInd(ip)
 
