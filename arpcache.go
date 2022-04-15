@@ -91,6 +91,7 @@ func (a *ArpCache) Get(ip net.IP) (net.HardwareAddr, bool) {
 		var hw net.HardwareAddr
 		return hw, false
 	}
+
 	return net.HardwareAddr(entry.hw[:]), true
 }
 
