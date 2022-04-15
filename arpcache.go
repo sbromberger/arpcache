@@ -18,7 +18,9 @@ func ipToInd(ip net.IP) (row, ind int) {
 
 func hwToBytes(hw net.HardwareAddr) [6]byte {
 	hb := [6]byte{}
-	copy(hb[:], hw[len(hw)-6:])
+	if len(hw) >= 6 {
+		copy(hb[:], hw[len(hw)-6:])
+	}
 	return hb
 }
 
