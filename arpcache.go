@@ -1,13 +1,16 @@
 package arpcache
 
 import (
+	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const rowSize = 256
 const numRows = 256
+const tickerDivisor = 10
 
 // ipToInd takes an IP address and returns the cache row and the offset into the
 // row. We use the last octet as the cache row so that within a /24, each IP
@@ -41,12 +44,34 @@ type cacheRow struct {
 }
 type ArpCache struct {
 	cache          [numRows]cacheRow
-	defaultTimeout int64 // timeout in seconds
+	defaultTimeout int64     // timeout in seconds
+	epoch          int64     // keep track of the epoch time here to reduce time.Now() calls
+	tickerCtl      chan bool // send true to stop ticker at end
 }
 
 // New creates a new ArpCache.
 func New(timeoutSeconds int64) *ArpCache {
-	return &ArpCache{cache: [numRows]cacheRow{}, defaultTimeout: timeoutSeconds}
+	n := timeoutSeconds / tickerDivisor
+	d, _ := time.ParseDuration(fmt.Sprintf("%ds", n))
+	ticker := time.NewTicker(d)
+	tCtl := make(chan bool)
+	a := &ArpCache{cache: [numRows]cacheRow{}, defaultTimeout: timeoutSeconds, epoch: time.Now().Unix(), tickerCtl: tCtl}
+	go func() {
+		for {
+			select {
+			case <-tCtl:
+				return
+			case <-ticker.C:
+				atomic.StoreInt64(&a.epoch, time.Now().Unix())
+			}
+		}
+	}()
+	return a
+}
+
+// Stop stops the timer subroutine.
+func (a *ArpCache) Stop() {
+	a.tickerCtl <- true
 }
 
 // SetDefaultTimeout sets the default timeout in seconds for an ArpCache.
@@ -62,7 +87,7 @@ func (a *ArpCache) Get(ip net.IP) (net.HardwareAddr, bool) {
 	a.cache[i].mu.RLock()
 	entry := a.cache[i].row[j]
 	a.cache[i].mu.RUnlock()
-	if entry.expires < time.Now().Unix() {
+	if entry.expires < a.epoch {
 		var hw net.HardwareAddr
 		return hw, false
 	}
@@ -76,7 +101,7 @@ func (a *ArpCache) Set(ip net.IP, hw net.HardwareAddr) {
 	defer a.cache[i].mu.Unlock()
 	entry := a.cache[i].row[j]
 	entry.hw = hwToBytes(hw)
-	entry.expires = time.Now().Unix() + a.defaultTimeout
+	entry.expires = a.epoch + a.defaultTimeout
 }
 
 // SetExpiry updates / changes the expiration time of a cache entry given its IP address.
