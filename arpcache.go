@@ -16,10 +16,11 @@ const tickerDivisor = 10
 // row. We use the last octet as the cache row so that within a /24, each IP
 // address gets its own mutex lock.
 func ipToInd(ip net.IP) (row, ind int) {
-	if len(ip) < 2 {
+	lIP := len(ip)
+	if lIP < 2 {
 		return 0, 0
 	}
-	return int(ip[len(ip)-1]), int(ip[len(ip)-2])
+	return int(ip[lIP-1]), int(ip[lIP-2])
 }
 
 func hwToBytes(hw net.HardwareAddr) [6]byte {
@@ -74,6 +75,10 @@ func (a *ArpCache) Stop() {
 	a.tickerCtl <- true
 }
 
+func (a *ArpCache) getEpoch() int64 {
+	return atomic.LoadInt64(&a.epoch)
+}
+
 // SetDefaultTimeout sets the default timeout in seconds for an ArpCache.
 func (a *ArpCache) SetDefaultTimeout(timeoutSeconds int64) {
 	a.defaultTimeout = timeoutSeconds
@@ -87,7 +92,7 @@ func (a *ArpCache) Get(ip net.IP) (net.HardwareAddr, bool) {
 	a.cache[i].mu.RLock()
 	entry := a.cache[i].row[j]
 	a.cache[i].mu.RUnlock()
-	if entry.expires < a.epoch {
+	if entry.expires < a.getEpoch() {
 		var hw net.HardwareAddr
 		return hw, false
 	}
@@ -102,7 +107,7 @@ func (a *ArpCache) Set(ip net.IP, hw net.HardwareAddr) {
 	defer a.cache[i].mu.Unlock()
 	entry := a.cache[i].row[j]
 	entry.hw = hwToBytes(hw)
-	entry.expires = a.epoch + a.defaultTimeout
+	entry.expires = a.getEpoch() + a.defaultTimeout
 }
 
 // SetExpiry updates / changes the expiration time of a cache entry given its IP address.
