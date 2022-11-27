@@ -31,7 +31,6 @@ func benchmarkMapSet(size int, b *testing.B) {
 			m[i] = i
 		}
 	}
-
 }
 
 func benchmarkArpCacheGet(size int, b *testing.B) {
@@ -83,24 +82,24 @@ func BenchmarkArpCacheSet4(b *testing.B) { benchmarkArpCacheSet(10000, b) }
 func BenchmarkArpCacheSet5(b *testing.B) { benchmarkArpCacheSet(100000, b) }
 func BenchmarkArpCacheSet6(b *testing.B) { benchmarkArpCacheSet(1000000, b) }
 
-// func BenchmarkMapSet1(b *testing.B) { benchmarkMapSet(10, b) }
-// func BenchmarkMapSet2(b *testing.B) { benchmarkMapSet(100, b) }
-// func BenchmarkMapSet3(b *testing.B) { benchmarkMapSet(1000, b) }
-// func BenchmarkMapSet4(b *testing.B) { benchmarkMapSet(10000, b) }
-// func BenchmarkMapSet5(b *testing.B) { benchmarkMapSet(100000, b) }
-// func BenchmarkMapSet6(b *testing.B) { benchmarkMapSet(1000000, b) }
-//
-// func BenchmarkArpCacheGet1(b *testing.B) { benchmarkArpCacheGet(10, b) }
-// func BenchmarkArpCacheGet2(b *testing.B) { benchmarkArpCacheGet(100, b) }
-// func BenchmarkArpCacheGet3(b *testing.B) { benchmarkArpCacheGet(1000, b) }
-// func BenchmarkArpCacheGet4(b *testing.B) { benchmarkArpCacheGet(10000, b) }
-// func BenchmarkArpCacheGet5(b *testing.B) { benchmarkArpCacheGet(100000, b) }
-// func BenchmarkArpCacheGet6(b *testing.B) { benchmarkArpCacheGet(1000000, b) }
-//
-// func BenchmarkMapGet1(b *testing.B) { benchmarkMapGet(10, b) }
-// func BenchmarkMapGet2(b *testing.B) { benchmarkMapGet(100, b) }
-//
-// func BenchmarkMapGet3(b *testing.B) { benchmarkMapGet(1000, b) }
-// func BenchmarkMapGet4(b *testing.B) { benchmarkMapGet(10000, b) }
-// func BenchmarkMapGet5(b *testing.B) { benchmarkMapGet(100000, b) }
-// func BenchmarkMapGet6(b *testing.B) { benchmarkMapGet(1000000, b) }
+func BenchmarkMapSet1(b *testing.B) { benchmarkMapSet(10, b) }
+func BenchmarkMapSet2(b *testing.B) { benchmarkMapSet(100, b) }
+func BenchmarkMapSet3(b *testing.B) { benchmarkMapSet(1000, b) }
+func BenchmarkMapSet4(b *testing.B) { benchmarkMapSet(10000, b) }
+func BenchmarkMapSet5(b *testing.B) { benchmarkMapSet(100000, b) }
+func BenchmarkMapSet6(b *testing.B) { benchmarkMapSet(1000000, b) }
+
+func BenchmarkArpCacheGet1(b *testing.B) { benchmarkArpCacheGet(10, b) }
+func BenchmarkArpCacheGet2(b *testing.B) { benchmarkArpCacheGet(100, b) }
+func BenchmarkArpCacheGet3(b *testing.B) { benchmarkArpCacheGet(1000, b) }
+func BenchmarkArpCacheGet4(b *testing.B) { benchmarkArpCacheGet(10000, b) }
+func BenchmarkArpCacheGet5(b *testing.B) { benchmarkArpCacheGet(100000, b) }
+func BenchmarkArpCacheGet6(b *testing.B) { benchmarkArpCacheGet(1000000, b) }
+
+func BenchmarkMapGet1(b *testing.B) { benchmarkMapGet(10, b) }
+func BenchmarkMapGet2(b *testing.B) { benchmarkMapGet(100, b) }
+
+func BenchmarkMapGet3(b *testing.B) { benchmarkMapGet(1000, b) }
+func BenchmarkMapGet4(b *testing.B) { benchmarkMapGet(10000, b) }
+func BenchmarkMapGet5(b *testing.B) { benchmarkMapGet(100000, b) }
+func BenchmarkMapGet6(b *testing.B) { benchmarkMapGet(1000000, b) }
