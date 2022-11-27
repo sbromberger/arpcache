@@ -2,23 +2,26 @@ package arpcache
 
 import (
 	"net"
-	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
-const rowSize = 256
-const numRows = 256
+const cacheSize = 256 * 256
 
-// ipToInd takes an IP address and returns the cache row and the offset into the
-// row. We use the last octet as the cache row so that within a /24, each IP
-// address gets its own mutex lock.
-func ipToInd(ip net.IP) (row, ind int) {
+// timer updates every timeoutSeconds /  timeoutDivisor seconds
+const timeoutDivisor = 10
+
+// ipToIndex takes an IP address and returns the offset into the row.
+func ipToIndex(ip net.IP) int {
 	if len(ip) < 2 {
-		return 0, 0
+		return 0
 	}
-	return int(ip[len(ip)-1]), int(ip[len(ip)-2])
+	return int(ip[len(ip)-1])<<8 + int(ip[len(ip)-2])
 }
 
+// hwToBytes takes a HardwareAddr and returns the last 6 bytes as the
+// MAC address.
 func hwToBytes(hw net.HardwareAddr) [6]byte {
 	hb := [6]byte{}
 	if len(hw) >= 6 {
@@ -32,21 +35,44 @@ type arpEntry struct {
 	hw      [6]byte // 48-bit mac
 }
 
-type arpRow [rowSize]arpEntry
-
-// cacheRow has its own mutex so we can hit multiple rows concurrently.
-type cacheRow struct {
-	mu  sync.RWMutex
-	row arpRow
-}
 type ArpCache struct {
-	cache          [numRows]cacheRow
+	cache          [cacheSize]*arpEntry
 	defaultTimeout int64 // timeout in seconds
+	now            int64
+	tickerStop     chan bool
 }
 
 // New creates a new ArpCache.
 func New(timeoutSeconds int64) *ArpCache {
-	return &ArpCache{cache: [numRows]cacheRow{}, defaultTimeout: timeoutSeconds}
+
+	// pre allocate each entry
+	// nyquist limit to achieve second resolution
+	ticker := time.NewTicker(time.Duration(timeoutSeconds/timeoutDivisor) * time.Second)
+
+	done := make(chan bool)
+	ac := &ArpCache{cache: [cacheSize]*arpEntry{}, defaultTimeout: timeoutSeconds, tickerStop: done}
+	for i := range ac.cache {
+		ac.cache[i] = &arpEntry{}
+	}
+
+	go func() {
+		select {
+		case <-done:
+			return
+		case tick := <-ticker.C:
+			atomic.StoreInt64(&ac.now, tick.Unix())
+		}
+	}()
+
+	return ac
+}
+
+func (a *ArpCache) Stop() {
+	a.tickerStop <- true
+}
+
+func (a *ArpCache) Now() int64 {
+	return atomic.LoadInt64(&a.now)
 }
 
 // SetDefaultTimeout sets the default timeout in seconds for an ArpCache.
@@ -57,39 +83,26 @@ func (a *ArpCache) SetDefaultTimeout(timeoutSeconds int64) {
 // Get returns a hardware address (and a boolean indicating whether found) given an IP address.
 // Get will return false if the entry is expired.
 func (a *ArpCache) Get(ip net.IP) (net.HardwareAddr, bool) {
-	i, j := ipToInd(ip)
+	i := ipToIndex(ip)
 
-	a.cache[i].mu.RLock()
-	entry := a.cache[i].row[j]
-	a.cache[i].mu.RUnlock()
-	if entry.expires < time.Now().Unix() {
-		var hw net.HardwareAddr
-		return hw, false
+	target := (*unsafe.Pointer)(unsafe.Pointer(&a.cache[i]))
+	entry := (*arpEntry)(atomic.LoadPointer(target))
+
+	if entry.expires < atomic.LoadInt64(&a.now) {
+		return net.HardwareAddr{}, false
 	}
-	return net.HardwareAddr(entry.hw[:]), true
+	return entry.hw[:], true
 }
 
-// Set assigns a hardware address to a given IP address and sets the expiration time.]
+// Set assigns a hardware address to a given IP address and sets the expiration time.
 func (a *ArpCache) Set(ip net.IP, hw net.HardwareAddr) {
-	i, j := ipToInd(ip)
-	a.cache[i].mu.Lock()
-	defer a.cache[i].mu.Unlock()
-	entry := a.cache[i].row[j]
-	entry.hw = hwToBytes(hw)
-	entry.expires = time.Now().Unix() + a.defaultTimeout
-}
+	i := ipToIndex(ip)
 
-// SetExpiry updates / changes the expiration time of a cache entry given its IP address.
-func (a *ArpCache) SetExpiry(ip net.IP, epoch int64) bool {
-	i, j := ipToInd(ip)
-	a.cache[i].mu.Lock()
-	defer a.cache[i].mu.Unlock()
-	entry := a.cache[i].row[j]
-	entry.expires = epoch
-	return true
-}
+	target := (*unsafe.Pointer)(unsafe.Pointer(&a.cache[i]))
+	value := arpEntry{
+		hw:      hwToBytes(hw),
+		expires: a.Now() + a.defaultTimeout,
+	}
 
-// Delete invalidates a cache entry by setting its expiration time to 0.
-func (a *ArpCache) Delete(ip net.IP) bool {
-	return a.SetExpiry(ip, 0)
+	atomic.StorePointer(target, unsafe.Pointer(&value))
 }
